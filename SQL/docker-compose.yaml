@@ -1,0 +1,32 @@
+version: '3'
+
+services:
+  db:
+    image: mysql:5.7
+    restart: always
+    container_name: mysqldb
+    environment:
+      MYSQL_DATABASE: 'testing'
+      MYSQL_ROOT_PASSWORD: 'toor@123'
+    ports:
+      # <Port exposed> : <MySQL Port running inside container>
+      - '3306:3306'
+    expose:
+      # Opens port 3306 on the container
+      - '3306'
+      # Where our data will be persisted
+    volumes:
+      - ./my-db:/var/lib/mysql
+  
+  workbench:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: workbench_container
+    ports:
+      - "3000:3000"
+    environment:
+      - SQLPAD_ADMIN=admin
+      - SQLPAD_ADMIN_PASSWORD=toor@123
+    volumes:
+      - ./data:/var/lib/sqlpad
