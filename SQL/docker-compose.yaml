@@ -18,15 +18,24 @@ services:
     volumes:
       - ./my-db:/var/lib/mysql
   
-  workbench:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: workbench_container
+        #  workbench:
+        #    build:
+        #      context: .
+        #      dockerfile: Dockerfile
+        #    container_name: workbench_container
+        #    ports:
+        #      - "3000:3000"
+        #    environment:
+        #     - SQLPAD_ADMIN=admin
+        #      - SQLPAD_ADMIN_PASSWORD=toor@123
+        #    volumes:
+        #      - ./data:/var/lib/sqlpad
+
+  mysql-workbench:
+    image: lscr.io/linuxserver/mysql-workbench:latest
+    container_name: mysql-workbench
     ports:
-      - "3000:3000"
-    environment:
-      - SQLPAD_ADMIN=admin
-      - SQLPAD_ADMIN_PASSWORD=toor@123
+      - '3000:3000'
+    restart: unless-stopped
     volumes:
-      - ./data:/var/lib/sqlpad
+      - ./sql-db:/config
