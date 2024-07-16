@@ -1,0 +1,53 @@
+pipeline {
+    agent any
+
+    tools {
+        // Install the Maven version configured as "M3" and add it to the path.
+        maven "maven"
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                script{
+                    git branch: 'main', url: 'https://github.com/abraham218/AB2024-data-analysis.git'
+                }
+                
+                sh """
+               cd ${WORKSPACE}/CICD-project/
+               mvn -Dmaven.test.failure.ignore=true clean package"""
+            }
+        }
+        stage('Docker Build'){
+            steps{
+                script{
+                    sh """
+                        cd ${WORKSPACE}/CICD-project/
+                        docker build -t webapp:${BUILD_NUMBER} .
+                        docker tag webapp:${BUILD_NUMBER} abramdocker/webapp:${BUILD_NUMBER}"""
+               }
+            }
+        }
+        stage('DockerLogin'){
+            steps{
+                script{
+                    withCredentials([string(credentialsId: 'DOCKER_LOGIN', variable: 'Docker_Creds')]){
+                        sh """
+                        docker login -u abramdocker -p ${Docker_Creds}
+                        docker push abramdocker/webapp:${BUILD_NUMBER}"""
+                    }
+                }
+            }
+        }
+        stage('Build Remote'){
+            steps{
+                script{
+                    sh """
+                    ssh -o StrictHostKeyChecking=no docker 'docker rm -f webapp || true'
+                    ssh -o StrictHostKeyChecking=no docker 'docker run -itd -p 8081:8081 --name webserver abramdocker/webapp:${BUILD_NUMBER}'"""
+                }
+            }
+        }
+    }
+}
+
