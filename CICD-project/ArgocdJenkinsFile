@@ -1,0 +1,76 @@
+pipeline {
+    agent any
+
+    tools {
+        // Install the Maven version configured as "M3" and add it to the path.
+        maven "maven"
+    }
+
+    environment {
+        ARGOCD_SERVER = '192.168.0.11:8080'
+        ARGOCD_APP_NAME = 'webapp'
+        ARGOCD_PROJECT = 'default'
+        ARGOCD_REPO_URL = 'https://github.com/abraham218/AB2024-data-analysis.git'
+        ARGOCD_PATH = 'CICD-project'
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                script {
+                    git branch: 'main', url: 'https://github.com/abraham218/AB2024-data-analysis.git'
+                }
+                sh """
+                    cd ${WORKSPACE}/CICD-project/
+                    mvn -Dmaven.test.failure.ignore=true clean package
+                """
+            }
+        }
+        stage('Docker Build') {
+            steps {
+                script {
+                    sh """
+                        cd ${WORKSPACE}/CICD-project/
+                        docker build -t webapp:${BUILD_NUMBER} .
+                        docker tag webapp:${BUILD_NUMBER} abramdocker/webapp:${BUILD_NUMBER}
+                    """
+                }
+            }
+        }
+        stage('Docker Login') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'DOCKER_LOGIN', variable: 'Docker_Creds')]) {
+                        sh """
+                            docker login -u abramdocker -p ${Docker_Creds}
+                            docker push abramdocker/webapp:${BUILD_NUMBER}
+                            sudo curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+                            sudo chmod +x /usr/local/bin/argocd
+                        """
+                    }
+                }
+            }
+        }
+        stage('Deploy with ArgoCD') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'ARGOCD_CREDENTIALS', passwordVariable: 'ARGOCD_PASSWORD', usernameVariable: 'ARGOCD_USERNAME')])  {
+                        sh """
+                            argocd login ${ARGOCD_SERVER} --username ${ARGOCD_USERNAME} --password ${ARGOCD_PASSWORD} --insecure
+                            
+                            argocd app create ${ARGOCD_APP_NAME} \
+                                --project ${ARGOCD_PROJECT} \
+                                --repo ${ARGOCD_REPO_URL} \
+                                --path ${ARGOCD_PATH} \
+                                --dest-server https://kubernetes.default.svc \
+                                --dest-namespace default || true
+                            
+                            argocd app sync ${ARGOCD_APP_NAME}
+                        """
+                    }
+                }
+            }
+        }
+    }
+}
+
